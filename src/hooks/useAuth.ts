@@ -3,39 +3,24 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 
 export function useAuth() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState({ id: 'auto-login', email: 'auto@sgq.com' });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Simulate that we're already logged in
+    setLoading(false);
   }, []);
 
+  // These methods are kept for compatibility but won't actually perform any operations
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    if (error) throw error;
     navigate('/');
+    return;
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    navigate('/login');
+    navigate('/');
+    return;
   };
 
   return { user, loading, login, logout };
