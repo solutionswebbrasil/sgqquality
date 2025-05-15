@@ -8,80 +8,144 @@ export function useAuth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    // Check if we have a session token in local storage
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // We have a session, check if it corresponds to a valid usuario
+        try {
+          const { data: userData, error } = await supabase.auth.getUser();
+          
+          if (!error && userData) {
+            // Get the user from the usuarios table
+            const { data: usuario } = await supabase
+              .from('usuarios')
+              .select('*')
+              .eq('username', userData.user.user_metadata.username || 'admin')
+              .eq('ativo', true)
+              .single();
+              
+            if (usuario) {
+              setUser(usuario);
+            } else {
+              // If no matching usuario, sign out
+              await supabase.auth.signOut();
+              setUser(null);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      
       setLoading(false);
-    });
+    };
+    
+    checkSession();
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        try {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          
+          if (authUser) {
+            // Get the user from the usuarios table
+            const { data: usuario } = await supabase
+              .from('usuarios')
+              .select('*')
+              .eq('username', authUser.user_metadata.username || 'admin')
+              .eq('ativo', true)
+              .single();
+            
+            if (usuario) {
+              setUser(usuario);
+            } else {
+              await supabase.auth.signOut();
+              setUser(null);
+            }
+          }
+        } catch (error) {
+          console.error('Auth change error:', error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
+      
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (username: string, password: string) => {
     try {
-      // First check in the usuarios table
-      const { data, error } = await supabase
+      // First check if the username/password is valid
+      const { data: isValidUser, error: validationError } = await supabase
+        .rpc('verify_usuario_password', {
+          user_username: username,
+          user_password: password
+        });
+      
+      if (validationError || !isValidUser) {
+        throw new Error('Usuário ou senha inválidos');
+      }
+      
+      // Retrieve user data
+      const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
         .select('*')
         .eq('username', username)
         .eq('ativo', true)
         .single();
-      
-      if (error || !data) {
+        
+      if (usuarioError || !usuario) {
         throw new Error('Usuário não encontrado ou inativo');
       }
-      
-      // Verify the password by matching it with the hashed version
-      const { data: passwordData, error: passwordError } = await supabase
-        .rpc('verify_usuario_password', {
-          user_username: username,
-          user_password: password
-        });
-        
-      if (passwordError || !passwordData) {
-        throw new Error('Senha incorreta');
-      }
-      
-      // If password is correct, use the standard supabase auth for session management
-      // Use a deterministic email based on username
-      const email = `${username}@sgq.com`;
-      
-      const { error: authError } = await supabase.auth.signInWithPassword({
-        email,
-        password
+
+      // Use auth to maintain session
+      const authEmail = `${username}@sgq.com`;
+
+      // Try to sign in with email
+      let { error: signInError } = await supabase.auth.signInWithPassword({
+        email: authEmail,
+        password: password
       });
       
-      if (authError) {
-        // If the user doesn't exist in auth, create it
+      // If user doesn't exist in auth, create it
+      if (signInError) {
         const { error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
+          email: authEmail,
+          password: password,
           options: {
             data: {
-              username
+              username: username
             }
           }
         });
         
         if (signUpError) throw signUpError;
         
-        // Try login again
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email,
-          password
+        // Try login again after signup
+        const { error: retryError } = await supabase.auth.signInWithPassword({
+          email: authEmail,
+          password: password
         });
         
-        if (loginError) throw loginError;
+        if (retryError) throw retryError;
       }
       
+      setUser(usuario);
       navigate('/');
     } catch (error) {
+      console.error('Login error:', error);
       throw error;
     }
   };
@@ -89,6 +153,7 @@ export function useAuth() {
   const logout = async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
+    setUser(null);
     navigate('/login');
   };
 
