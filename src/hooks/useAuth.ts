@@ -23,13 +23,21 @@ export function useAuth() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    });
-    if (error) throw error;
-    navigate('/');
+  const login = async (username: string, password: string) => {
+    try {
+      // Generate deterministic email from username
+      const email = `${username}@sgq.com`;
+      
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
+      navigate('/');
+    } catch (error) {
+      throw error;
+    }
   };
 
   const logout = async () => {

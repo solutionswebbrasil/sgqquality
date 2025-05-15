@@ -5,7 +5,7 @@ import { useAuthContext } from '../components/AuthProvider';
 function Login() {
   const navigate = useNavigate();
   const { user, login } = useAuthContext();
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -18,9 +18,9 @@ function Login() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await login(email, password);
+      await login(username, password);
     } catch (error: any) {
-      setError('Email ou senha inválidos. Por favor, tente novamente.');
+      setError('Usuário ou senha inválidos. Por favor, tente novamente.');
     }
   };
 
@@ -35,16 +35,16 @@ function Login() {
         )}
         <form onSubmit={handleLogin}>
           <div className="mb-4">
-            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="email">
-              Email
+            <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="username">
+              Usuário
             </label>
             <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              type="text"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-              placeholder="Digite seu email"
+              placeholder="Digite seu usuário"
               required
             />
           </div>
