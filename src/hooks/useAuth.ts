@@ -19,12 +19,13 @@ export function useAuth() {
           
           if (!error && userData) {
             // Get the user from the usuarios table
-            const { data: usuario } = await supabase
+            const { data: usuario, error: userError } = await supabase
               .from('usuarios')
               .select('*')
               .eq('username', userData.user.user_metadata.username || 'admin')
               .eq('ativo', true)
-              .single();
+              .limit(1)
+              .maybeSingle();
               
             if (usuario) {
               setUser(usuario);
@@ -55,12 +56,13 @@ export function useAuth() {
           
           if (authUser) {
             // Get the user from the usuarios table
-            const { data: usuario } = await supabase
+            const { data: usuario, error: userError } = await supabase
               .from('usuarios')
               .select('*')
               .eq('username', authUser.user_metadata.username || 'admin')
               .eq('ativo', true)
-              .single();
+              .limit(1)
+              .maybeSingle();
             
             if (usuario) {
               setUser(usuario);
@@ -87,6 +89,11 @@ export function useAuth() {
 
   const login = async (username: string, password: string) => {
     try {
+      // Validate input
+      if (!username.trim() || !password.trim()) {
+        throw new Error('Usuário e senha são obrigatórios.');
+      }
+
       // First check if the username/password is valid
       const { data: isValidUser, error: validationError } = await supabase
         .rpc('verify_usuario_password', {
@@ -102,12 +109,13 @@ export function useAuth() {
         throw new Error('Credenciais inválidas. Verifique seu usuário e senha.');
       }
       
-      // Retrieve user data
+      // Retrieve user data - using maybeSingle() and limit(1) to handle multiple rows properly
       const { data: usuario, error: usuarioError } = await supabase
         .from('usuarios')
         .select('*')
         .eq('username', username)
-        .single();
+        .limit(1)
+        .maybeSingle();
         
       if (usuarioError) {
         throw new Error(`Erro ao buscar dados do usuário: ${usuarioError.message}`);

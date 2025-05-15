@@ -17,6 +17,19 @@ function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(''); // Clear previous errors
+    
+    // Validate inputs
+    if (!username.trim()) {
+      setError('Por favor, informe o nome de usuário.');
+      return;
+    }
+    
+    if (!password.trim()) {
+      setError('Por favor, informe a senha.');
+      return;
+    }
+    
     try {
       await login(username, password);
     } catch (error: any) {
