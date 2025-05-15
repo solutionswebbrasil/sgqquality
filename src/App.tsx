@@ -22,7 +22,6 @@ import RegistroNC from './pages/RegistroNC';
 import ConsultaNC from './pages/ConsultaNC';
 import RegistroAuditoria from './pages/RegistroAuditoria';
 import ConsultaAuditorias from './pages/ConsultaAuditorias';
-import ArquivamentoITs from './pages/ArquivamentoITs';
 import Graficos from './pages/Graficos';
 
 function App() {
@@ -50,7 +49,6 @@ function App() {
               <Route path="tco" element={<TCO />} />
               <Route path="registro-nc" element={<RegistroNC />} />
               <Route path="registro-auditoria" element={<RegistroAuditoria />} />
-              <Route path="arquivamento-its" element={<ArquivamentoITs />} />
               
               {/* Consultas */}
               <Route path="consulta-toners" element={<ConsultaToners />} />

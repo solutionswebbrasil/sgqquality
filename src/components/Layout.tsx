@@ -17,7 +17,6 @@ const menuCategories = {
     { path: '/registro-movimentacoes', label: 'Registro de Movimentações', icon: Truck },
     { path: '/registro-retornados', label: 'Registro de Retornados', icon: Box },
     { path: '/registro-nc', label: 'Registro de NC', icon: AlertTriangle },
-    { path: '/arquivamento-its', label: 'Arquivamento de ITs', icon: FileText },
   ],
   'Registros - Auditoria': [
     { path: '/registro-auditoria', label: 'Registro de Auditoria', icon: ClipboardCheck },
