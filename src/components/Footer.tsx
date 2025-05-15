@@ -1,4 +1,5 @@
 import React from 'react';
+import { Settings } from 'lucide-react';
 import useDarkMode from '../hooks/useDarkMode';
 
 function Footer() {
@@ -14,6 +15,12 @@ function Footer() {
           </p>
         </div>
         <div className={`mt-8 pt-6 border-t border-gray-700 text-center text-sm text-gray-400`}>
+          <div className="flex justify-center items-center gap-2 mb-3">
+            <a href="#" className="flex items-center gap-2 hover:text-white transition-colors">
+              <Settings className="w-5 h-5" />
+              <span>Configurações</span>
+            </a>
+          </div>
           <p>&copy; {new Date().getFullYear()} SGQ. Todos os direitos reservados.</p>
         </div>
       </div>
