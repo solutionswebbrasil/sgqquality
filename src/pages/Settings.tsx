@@ -1,12 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Settings as SettingsIcon, UserPlus, Trash2, Shield, Save, X } from 'lucide-react';
+import { Settings as SettingsIcon, UserPlus, Trash2, Shield, Save, X, UserCog } from 'lucide-react';
 import AdminPasswordModal from '../components/AdminPasswordModal';
 
 type User = {
   id: string;
   email: string;
   username?: string;
+  created_at: string;
+};
+
+type Usuario = {
+  id: string;
+  username: string;
+  nome_completo: string;
+  cargo: string;
+  ativo: boolean;
+  is_admin: boolean;
   created_at: string;
 };
 
@@ -26,10 +36,13 @@ type MenuPermission = {
 
 function Settings() {
   const [users, setUsers] = useState<User[]>([]);
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newNomeCompleto, setNewNomeCompleto] = useState('');
+  const [newCargo, setNewCargo] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -46,12 +59,29 @@ function Settings() {
   const checkAdminAccess = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      
       if (!user) {
         setIsAdmin(false);
         setLoading(false);
         return;
       }
 
+      // Check in usuarios table
+      const { data: usuarioData } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('is_admin', true)
+        .single();
+        
+      if (usuarioData) {
+        setIsAdmin(true);
+        setLoading(false);
+        fetchUsuarios();
+        initializeMenuPermissions();
+        return;
+      }
+
+      // Fall back to checking in user_roles
       const { data: userRoles } = await supabase
         .from('user_roles')
         .select('roles(name)')
@@ -62,7 +92,7 @@ function Settings() {
       setLoading(false);
 
       if (hasAdminRole) {
-        fetchUsers();
+        fetchUsuarios();
         initializeMenuPermissions();
       }
     } catch (error) {
@@ -119,21 +149,18 @@ function Settings() {
     setMenuPermissions(permissions);
   };
 
-  const fetchUsers = async () => {
+  const fetchUsuarios = async () => {
     try {
-      const { data, error } = await supabase.auth.admin.listUsers();
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .order('username');
       
       if (error) throw error;
       
-      // Filter out admin users
-      const filteredUsers = data.users.filter(user => {
-        const metadata = user.user_metadata as any;
-        return metadata?.username !== 'admin';
-      });
-      
-      setUsers(filteredUsers);
+      setUsuarios(data || []);
     } catch (error: any) {
-      console.error('Error fetching users:', error);
+      console.error('Error fetching usuarios:', error);
       setError(`Erro ao buscar usuários: ${error.message}`);
     }
   };
@@ -166,8 +193,8 @@ function Settings() {
   const handleCreateUser = () => {
     if (!isAdmin) return;
     
-    if (!validateUsername(newUsername)) {
-      setError('Username deve estar no formato nome.sobrenome');
+    if (!newUsername.trim()) {
+      setError('Nome de usuário é obrigatório');
       return;
     }
     
@@ -178,12 +205,6 @@ function Settings() {
     
     setCurrentAction('add');
     setShowPasswordModal(true);
-  };
-
-  const validateUsername = (username: string): boolean => {
-    // Check if username follows firstname.lastname format
-    const pattern = /^[a-zA-Z]+\.[a-zA-Z]+$/;
-    return pattern.test(username);
   };
 
   const handleDeleteUser = (userId: string) => {
@@ -250,18 +271,19 @@ function Settings() {
   const handleAdminPasswordConfirm = async () => {
     if (currentAction === 'add') {
       try {
-        // Format the email from the username
-        const email = `${newUsername}@sgq.com`;
-        
-        // Create the user
-        const { data, error } = await supabase.auth.admin.createUser({
-          email,
-          password: newPassword,
-          email_confirm: true,
-          user_metadata: {
-            username: newUsername
-          }
-        });
+        // Insert into usuarios table
+        const { data, error } = await supabase
+          .from('usuarios')
+          .insert([{
+            username: newUsername,
+            password_hash: await supabase.rpc('hash_password', { password: newPassword }),
+            nome_completo: newNomeCompleto,
+            cargo: newCargo,
+            ativo: true,
+            is_admin: false
+          }])
+          .select()
+          .single();
         
         if (error) throw error;
         
@@ -269,15 +291,17 @@ function Settings() {
         const { error: permError } = await supabase
           .from('user_permissions')
           .insert([{ 
-            user_id: data.user.id,
+            user_id: data.id,
             permission_id: 'menu_/'  // Default permission to see dashboard
           }]);
           
         if (permError) throw permError;
         
-        fetchUsers();
+        fetchUsuarios();
         setNewUsername('');
         setNewPassword('');
+        setNewNomeCompleto('');
+        setNewCargo('');
         setSuccess('Usuário criado com sucesso');
         setTimeout(() => setSuccess(null), 3000);
       } catch (error: any) {
@@ -292,20 +316,15 @@ function Settings() {
           .delete()
           .eq('user_id', selectedUserId);
           
-        // Delete user roles
-        await supabase
-          .from('user_roles')
+        // Delete from usuarios table
+        const { error } = await supabase
+          .from('usuarios')
           .delete()
-          .eq('user_id', selectedUserId);
-        
-        // Then delete the user
-        const { error } = await supabase.auth.admin.deleteUser(
-          selectedUserId
-        );
+          .eq('id', selectedUserId);
         
         if (error) throw error;
         
-        fetchUsers();
+        fetchUsuarios();
         setSuccess('Usuário excluído com sucesso');
         setTimeout(() => setSuccess(null), 3000);
       } catch (error: any) {
@@ -361,17 +380,17 @@ function Settings() {
         {/* Add User Form */}
         <div className="bg-gray-50 p-4 rounded-lg mb-6">
           <h4 className="text-md font-medium text-gray-800 mb-3">Adicionar Novo Usuário</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Usuário (nome.sobrenome)
+                Usuário
               </label>
               <input
                 type="text"
                 value={newUsername}
                 onChange={(e) => setNewUsername(e.target.value.toLowerCase())}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
-                placeholder="joao.silva"
+                placeholder="Nome de usuário"
               />
             </div>
             <div>
@@ -386,15 +405,39 @@ function Settings() {
                 placeholder="Mínimo 6 caracteres"
               />
             </div>
-            <div className="flex items-end">
-              <button
-                onClick={handleCreateUser}
-                className="flex items-center gap-2 px-4 py-2 bg-[#3f4c6b] hover:bg-[#2c3e50] text-white rounded-md"
-              >
-                <UserPlus className="w-4 h-4" />
-                Adicionar Usuário
-              </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nome Completo
+              </label>
+              <input
+                type="text"
+                value={newNomeCompleto}
+                onChange={(e) => setNewNomeCompleto(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Nome completo"
+              />
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cargo
+              </label>
+              <input
+                type="text"
+                value={newCargo}
+                onChange={(e) => setNewCargo(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Cargo ou função"
+              />
+            </div>
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={handleCreateUser}
+              className="flex items-center gap-2 px-4 py-2 bg-[#3f4c6b] hover:bg-[#2c3e50] text-white rounded-md"
+            >
+              <UserPlus className="w-4 h-4" />
+              Adicionar Usuário
+            </button>
           </div>
         </div>
 
@@ -404,52 +447,69 @@ function Settings() {
             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
               <tr>
                 <th className="px-6 py-3">Usuário</th>
-                <th className="px-6 py-3">Email</th>
-                <th className="px-6 py-3">Data de Criação</th>
+                <th className="px-6 py-3">Nome Completo</th>
+                <th className="px-6 py-3">Cargo</th>
+                <th className="px-6 py-3">Status</th>
+                <th className="px-6 py-3">Criado em</th>
                 <th className="px-6 py-3">Ações</th>
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => {
-                // Try to get username from metadata
-                let username = '';
-                if (user.user_metadata && typeof user.user_metadata === 'object') {
-                  username = (user.user_metadata as any).username || '';
-                }
-                
-                return (
-                  <tr key={user.id} className="bg-white border-b hover:bg-gray-50">
-                    <td className="px-6 py-4 font-medium text-gray-900">
-                      {username || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4">{user.email}</td>
-                    <td className="px-6 py-4">
-                      {new Date(user.created_at).toLocaleDateString('pt-BR')}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleManagePermissions(user.id)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="Gerenciar Permissões"
-                        >
-                          <Shield className="w-5 h-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900"
-                          title="Excluir Usuário"
-                        >
-                          <Trash2 className="w-5 h-5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {users.length === 0 && (
+              {usuarios.map((usuario) => (
+                <tr key={usuario.id} className="bg-white border-b hover:bg-gray-50">
+                  <td className="px-6 py-4 font-medium text-gray-900">
+                    {usuario.username}
+                  </td>
+                  <td className="px-6 py-4">{usuario.nome_completo || '-'}</td>
+                  <td className="px-6 py-4">{usuario.cargo || '-'}</td>
+                  <td className="px-6 py-4">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      usuario.ativo 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {usuario.ativo ? 'Ativo' : 'Inativo'}
+                    </span>
+                    {usuario.is_admin && (
+                      <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                        Admin
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {new Date(usuario.created_at).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex space-x-2">
+                      <button
+                        onClick={() => handleManagePermissions(usuario.id)}
+                        className="text-blue-600 hover:text-blue-900"
+                        title="Gerenciar Permissões"
+                      >
+                        <Shield className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => {/* TODO: Edit user */}}
+                        className="text-indigo-600 hover:text-indigo-900"
+                        title="Editar Usuário"
+                      >
+                        <UserCog className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(usuario.id)}
+                        className="text-red-600 hover:text-red-900"
+                        title="Excluir Usuário"
+                        disabled={usuario.is_admin}
+                      >
+                        <Trash2 className={`w-5 h-5 ${usuario.is_admin ? 'opacity-50 cursor-not-allowed' : ''}`} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {usuarios.length === 0 && (
                 <tr className="bg-white border-b">
-                  <td colSpan={4} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
                     Nenhum usuário encontrado
                   </td>
                 </tr>
