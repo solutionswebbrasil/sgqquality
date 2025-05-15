@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart, Menu } from 'lucide-react';
+import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart, Menu, LogOut } from 'lucide-react';
 import Footer from './Footer';
 import { useAuthContext } from './AuthProvider';
 import useDarkMode from '../hooks/useDarkMode';
@@ -53,7 +53,7 @@ function Layout() {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        // If no user, allow all paths (since we're bypassing authentication)
+        // If no user, allow only dashboard
         setAllowedMenuPaths(['/']);
         return;
       }
@@ -198,6 +198,13 @@ function Layout() {
                   }`}
                 >
                   {isDarkMode ? '☀️' : '🌙'}
+                </button>
+                <button
+                  onClick={logout}
+                  className="flex items-center gap-2 px-4 py-2 text-red-600 hover:text-red-800"
+                >
+                  <LogOut className="w-5 h-5" />
+                  Sair
                 </button>
               </div>
             </div>

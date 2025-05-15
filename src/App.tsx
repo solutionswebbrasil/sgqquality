@@ -1,9 +1,10 @@
 import React, { Suspense } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './components/AuthProvider';
 import { PrivateRoute } from './components/PrivateRoute';
 import Layout from './components/Layout';
 import LoadingSpinner from './components/LoadingSpinner';
+import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CadastroToners from './pages/CadastroToners';
 import CadastroUnidades from './pages/CadastroUnidades';
@@ -29,11 +30,15 @@ function App() {
       <AuthProvider>
         <Suspense fallback={<LoadingSpinner />}>
           <Routes>
-            {/* Redirect from login to dashboard */}
-            <Route path="/login" element={<Navigate to="/" replace />} />
+            {/* Public Route */}
+            <Route path="/login" element={<Login />} />
             
-            {/* All routes are accessible without authentication now */}
-            <Route path="/" element={<Layout />}>
+            {/* Protected Routes */}
+            <Route path="/" element={
+              <PrivateRoute>
+                <Layout />
+              </PrivateRoute>
+            }>
               <Route index element={<Dashboard />} />
               
               {/* Cadastros */}
