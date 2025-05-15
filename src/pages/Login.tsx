@@ -20,7 +20,8 @@ function Login() {
     try {
       await login(username, password);
     } catch (error: any) {
-      setError('Usuário ou senha inválidos. Por favor, tente novamente.');
+      // Display the specific error message from the useAuth hook
+      setError(error.message || 'Ocorreu um erro durante o login. Por favor, tente novamente.');
     }
   };
 

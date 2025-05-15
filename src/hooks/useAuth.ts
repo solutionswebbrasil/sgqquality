@@ -94,8 +94,12 @@ export function useAuth() {
           user_password: password
         });
       
-      if (validationError || !isValidUser) {
-        throw new Error('Usuário ou senha inválidos');
+      if (validationError) {
+        throw new Error(`Erro de validação: ${validationError.message}`);
+      }
+      
+      if (!isValidUser) {
+        throw new Error('Credenciais inválidas. Verifique seu usuário e senha.');
       }
       
       // Retrieve user data
@@ -103,11 +107,18 @@ export function useAuth() {
         .from('usuarios')
         .select('*')
         .eq('username', username)
-        .eq('ativo', true)
         .single();
         
-      if (usuarioError || !usuario) {
-        throw new Error('Usuário não encontrado ou inativo');
+      if (usuarioError) {
+        throw new Error(`Erro ao buscar dados do usuário: ${usuarioError.message}`);
+      }
+      
+      if (!usuario) {
+        throw new Error('Usuário não encontrado.');
+      }
+      
+      if (!usuario.ativo) {
+        throw new Error('Conta de usuário está inativa. Entre em contato com o administrador.');
       }
 
       // Use auth to maintain session
@@ -121,6 +132,8 @@ export function useAuth() {
       
       // If user doesn't exist in auth, create it
       if (signInError) {
+        console.log('Usuário não existe no Auth, criando...');
+        
         const { error: signUpError } = await supabase.auth.signUp({
           email: authEmail,
           password: password,
@@ -131,7 +144,9 @@ export function useAuth() {
           }
         });
         
-        if (signUpError) throw signUpError;
+        if (signUpError) {
+          throw new Error(`Erro ao criar novo usuário: ${signUpError.message}`);
+        }
         
         // Try login again after signup
         const { error: retryError } = await supabase.auth.signInWithPassword({
@@ -139,22 +154,29 @@ export function useAuth() {
           password: password
         });
         
-        if (retryError) throw retryError;
+        if (retryError) {
+          throw new Error(`Erro ao fazer login após criar usuário: ${retryError.message}`);
+        }
       }
       
       setUser(usuario);
       navigate('/');
     } catch (error) {
       console.error('Login error:', error);
-      throw error;
+      throw error; // Propagate the error with its message
     }
   };
 
   const logout = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    navigate('/login');
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw new Error(`Erro ao sair: ${error.message}`);
+      setUser(null);
+      navigate('/login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
+    }
   };
 
   return { user, loading, login, logout };
