@@ -8,23 +8,22 @@ export function useAuth() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if we have a session token in local storage
+    // Check current auth state when component mounts
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        // We have a session, check if it corresponds to a valid usuario
         try {
-          const { data: userData, error } = await supabase.auth.getUser();
+          // Get auth user data
+          const { data: { user: authUser } } = await supabase.auth.getUser();
           
-          if (!error && userData) {
-            // Get the user from the usuarios table
+          if (authUser) {
+            // Get the user from usuarios table
             const { data: usuario, error: userError } = await supabase
               .from('usuarios')
               .select('*')
-              .eq('username', userData.user.user_metadata.username || 'admin')
+              .eq('username', authUser.user_metadata.username || 'admin')
               .eq('ativo', true)
-              .limit(1)
               .maybeSingle();
               
             if (usuario) {
@@ -37,10 +36,9 @@ export function useAuth() {
           }
         } catch (error) {
           console.error('Error fetching user data:', error);
+          await supabase.auth.signOut();
           setUser(null);
         }
-      } else {
-        setUser(null);
       }
       
       setLoading(false);
@@ -50,18 +48,16 @@ export function useAuth() {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
+      if (event === 'SIGNED_IN' && session) {
         try {
           const { data: { user: authUser } } = await supabase.auth.getUser();
           
           if (authUser) {
-            // Get the user from the usuarios table
             const { data: usuario, error: userError } = await supabase
               .from('usuarios')
               .select('*')
               .eq('username', authUser.user_metadata.username || 'admin')
               .eq('ativo', true)
-              .limit(1)
               .maybeSingle();
             
             if (usuario) {
@@ -75,7 +71,7 @@ export function useAuth() {
           console.error('Auth change error:', error);
           setUser(null);
         }
-      } else {
+      } else if (event === 'SIGNED_OUT') {
         setUser(null);
       }
       
@@ -94,7 +90,7 @@ export function useAuth() {
         throw new Error('Usuário e senha são obrigatórios.');
       }
 
-      // First check if the username/password is valid
+      // Verify the password using the database function
       const { data: isValidUser, error: validationError } = await supabase
         .rpc('verify_usuario_password', {
           user_username: username,
@@ -106,34 +102,40 @@ export function useAuth() {
       }
       
       if (!isValidUser) {
-        throw new Error('Credenciais inválidas. Verifique seu usuário e senha.');
+        throw new Error('Usuário ou senha inválidos.');
       }
       
-      // Retrieve user data - using maybeSingle() and limit(1) to handle multiple rows properly
-      const { data: usuario, error: usuarioError } = await supabase
+      // Get the user from usuarios table
+      const { data: usuario, error: userError } = await supabase
         .from('usuarios')
         .select('*')
         .eq('username', username)
         .limit(1)
         .maybeSingle();
         
-      if (usuarioError) {
-        throw new Error(`Erro ao buscar dados do usuário: ${usuarioError.message}`);
+      if (userError) {
+        throw new Error(`Erro ao buscar dados do usuário: ${userError.message}`);
       }
       
-      // Use auth to maintain session
+      if (!usuario) {
+        throw new Error('Usuário não encontrado.');
+      }
+      
+      if (!usuario.ativo) {
+        throw new Error('Sua conta está desativada. Entre em contato com o administrador.');
+      }
+      
+      // Create auth session via email sign-in
+      // Use a consistent email format based on username
       const authEmail = `${username}@sgq.com`;
 
-      // Try to sign in with email
-      let { error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: authEmail,
         password: password
       });
       
-      // If user doesn't exist in auth, create it
+      // If sign-in fails (user doesn't exist in auth), create the auth user
       if (signInError) {
-        console.log('Usuário não existe no Auth, criando...');
-        
         const { error: signUpError } = await supabase.auth.signUp({
           email: authEmail,
           password: password,
@@ -145,70 +147,32 @@ export function useAuth() {
         });
         
         if (signUpError) {
-          throw new Error(`Erro ao criar novo usuário: ${signUpError.message}`);
+          throw new Error(`Erro ao criar usuário: ${signUpError.message}`);
         }
         
-        // Try login again after signup
+        // Try login again
         const { error: retryError } = await supabase.auth.signInWithPassword({
           email: authEmail,
           password: password
         });
         
         if (retryError) {
-          throw new Error(`Erro ao fazer login após criar usuário: ${retryError.message}`);
+          throw new Error(`Erro ao fazer login: ${retryError.message}`);
         }
       }
       
-      // If user doesn't exist in usuarios table, create it
-      if (!usuario) {
-        console.log('Usuário autenticado, mas não encontrado na tabela usuarios. Criando...');
-        
-        // Hash the password for storage (assuming there's a function for this)
-        const { error: createError } = await supabase
-          .from('usuarios')
-          .insert({
-            username: username,
-            password_hash: password, // This would normally be hashed, but we're using verify_usuario_password RPC
-            nome_completo: username, // Default to username
-            ativo: true,
-            is_admin: false, // New users are not admins by default
-          });
-          
-        if (createError) {
-          throw new Error(`Erro ao criar usuário na tabela usuarios: ${createError.message}`);
-        }
-        
-        // Re-fetch the user to get the complete record including the generated ID
-        const { data: newUsuario, error: fetchError } = await supabase
-          .from('usuarios')
-          .select('*')
-          .eq('username', username)
-          .limit(1)
-          .maybeSingle();
-          
-        if (fetchError || !newUsuario) {
-          throw new Error('Erro ao recuperar dados do usuário recém-criado.');
-        }
-        
-        setUser(newUsuario);
-      } else {
-        if (!usuario.ativo) {
-          throw new Error('Conta de usuário está inativa. Entre em contato com o administrador.');
-        }
-        setUser(usuario);
-      }
-      
+      setUser(usuario);
       navigate('/');
     } catch (error) {
       console.error('Login error:', error);
-      throw error; // Propagate the error with its message
+      throw error;
     }
   };
 
   const logout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
-      if (error) throw new Error(`Erro ao sair: ${error.message}`);
+      if (error) throw error;
       setUser(null);
       navigate('/login');
     } catch (error) {
