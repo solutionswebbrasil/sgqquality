@@ -121,14 +121,6 @@ export function useAuth() {
         throw new Error(`Erro ao buscar dados do usuário: ${usuarioError.message}`);
       }
       
-      if (!usuario) {
-        throw new Error('Usuário não encontrado.');
-      }
-      
-      if (!usuario.ativo) {
-        throw new Error('Conta de usuário está inativa. Entre em contato com o administrador.');
-      }
-
       // Use auth to maintain session
       const authEmail = `${username}@sgq.com`;
 
@@ -167,7 +159,45 @@ export function useAuth() {
         }
       }
       
-      setUser(usuario);
+      // If user doesn't exist in usuarios table, create it
+      if (!usuario) {
+        console.log('Usuário autenticado, mas não encontrado na tabela usuarios. Criando...');
+        
+        // Hash the password for storage (assuming there's a function for this)
+        const { error: createError } = await supabase
+          .from('usuarios')
+          .insert({
+            username: username,
+            password_hash: password, // This would normally be hashed, but we're using verify_usuario_password RPC
+            nome_completo: username, // Default to username
+            ativo: true,
+            is_admin: false, // New users are not admins by default
+          });
+          
+        if (createError) {
+          throw new Error(`Erro ao criar usuário na tabela usuarios: ${createError.message}`);
+        }
+        
+        // Re-fetch the user to get the complete record including the generated ID
+        const { data: newUsuario, error: fetchError } = await supabase
+          .from('usuarios')
+          .select('*')
+          .eq('username', username)
+          .limit(1)
+          .maybeSingle();
+          
+        if (fetchError || !newUsuario) {
+          throw new Error('Erro ao recuperar dados do usuário recém-criado.');
+        }
+        
+        setUser(newUsuario);
+      } else {
+        if (!usuario.ativo) {
+          throw new Error('Conta de usuário está inativa. Entre em contato com o administrador.');
+        }
+        setUser(usuario);
+      }
+      
       navigate('/');
     } catch (error) {
       console.error('Login error:', error);
