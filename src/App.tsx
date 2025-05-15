@@ -12,8 +12,6 @@ import RegistroRetornados from './pages/RegistroRetornados';
 import ConsultaToners from './pages/ConsultaToners';
 import ConsultaUnidades from './pages/ConsultaUnidades';
 import ConsultaRetornados from './pages/ConsultaRetornados';
-import RegistroMovimentacoes from './pages/RegistroMovimentacoes';
-import ConsultaMovimentacoes from './pages/ConsultaMovimentacoes';
 import RegistroGarantias from './pages/RegistroGarantias';
 import ConsultaGarantias from './pages/ConsultaGarantias';
 import TCO from './pages/TCO';
@@ -44,7 +42,6 @@ function App() {
               
               {/* Registros */}
               <Route path="registro-retornados" element={<RegistroRetornados />} />
-              <Route path="registro-movimentacoes" element={<RegistroMovimentacoes />} />
               <Route path="registro-garantias" element={<RegistroGarantias />} />
               <Route path="tco" element={<TCO />} />
               <Route path="registro-nc" element={<RegistroNC />} />
@@ -54,7 +51,6 @@ function App() {
               <Route path="consulta-toners" element={<ConsultaToners />} />
               <Route path="consulta-unidades" element={<ConsultaUnidades />} />
               <Route path="consulta-retornados" element={<ConsultaRetornados />} />
-              <Route path="consulta-movimentacoes" element={<ConsultaMovimentacoes />} />
               <Route path="consulta-garantias" element={<ConsultaGarantias />} />
               <Route path="consulta-tco" element={<ConsultaTCO />} />
               <Route path="consulta-nc" element={<ConsultaNC />} />

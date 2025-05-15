@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Database, Box, Truck, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart } from 'lucide-react';
+import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart } from 'lucide-react';
 import Footer from './Footer';
 import { useAuthContext } from './AuthProvider';
 import useDarkMode from '../hooks/useDarkMode';
@@ -14,7 +14,6 @@ const menuCategories = {
   'Registros - Qualidade': [
     { path: '/registro-garantias', label: 'Registro de Garantias', icon: Shield },
     { path: '/tco', label: 'Registro de TCO', icon: FileSpreadsheet },
-    { path: '/registro-movimentacoes', label: 'Registro de Movimentações', icon: Truck },
     { path: '/registro-retornados', label: 'Registro de Retornados', icon: Box },
     { path: '/registro-nc', label: 'Registro de NC', icon: AlertTriangle },
   ],
@@ -23,7 +22,6 @@ const menuCategories = {
   ],
   Consultas: [
     { path: '/consulta-garantias', label: 'Consulta de Garantias', icon: Shield },
-    { path: '/consulta-movimentacoes', label: 'Consulta de Movimentações', icon: Truck },
     { path: '/consulta-retornados', label: 'Consulta de Retornados', icon: Box },
     { path: '/consulta-toners', label: 'Consulta de Toners', icon: Database },
     { path: '/consulta-unidades', label: 'Consulta de Unidades', icon: Box },
