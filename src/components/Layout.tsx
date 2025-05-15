@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
-import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart } from 'lucide-react';
+import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart, Menu } from 'lucide-react';
 import Footer from './Footer';
 import { useAuthContext } from './AuthProvider';
 import useDarkMode from '../hooks/useDarkMode';
@@ -94,9 +94,22 @@ function Layout() {
         <div className="flex-1 flex flex-col">
           <header className={`${isDarkMode ? 'bg-gray-800' : 'bg-white'} shadow`}>
             <div className="px-4 py-6 flex justify-between items-center">
-              <h1 className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
-                {getCurrentPageTitle()}
-              </h1>
+              <div className="flex items-center gap-4">
+                {!isSidebarOpen && (
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className={`p-2 rounded-md ${
+                      isDarkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-700'
+                    }`}
+                    aria-label="Open menu"
+                  >
+                    <Menu className="w-5 h-5" />
+                  </button>
+                )}
+                <h1 className={`text-2xl font-semibold ${isDarkMode ? 'text-white' : 'text-gray-800'}`}>
+                  {getCurrentPageTitle()}
+                </h1>
+              </div>
               <div className="flex items-center gap-4">
                 <button
                   onClick={toggleDarkMode}
