@@ -21,6 +21,7 @@ import ConsultaNC from './pages/ConsultaNC';
 import RegistroAuditoria from './pages/RegistroAuditoria';
 import ConsultaAuditorias from './pages/ConsultaAuditorias';
 import Graficos from './pages/Graficos';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -58,6 +59,9 @@ function App() {
               
               {/* Gráficos */}
               <Route path="graficos" element={<Graficos />} />
+
+              {/* Settings */}
+              <Route path="settings" element={<Settings />} />
             </Route>
           </Routes>
         </Suspense>

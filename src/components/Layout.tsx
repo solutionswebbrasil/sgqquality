@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Database, Box, Shield, FileSpreadsheet, AlertTriangle, ClipboardCheck, FileText, BarChart, Menu } from 'lucide-react';
 import Footer from './Footer';
 import { useAuthContext } from './AuthProvider';
 import useDarkMode from '../hooks/useDarkMode';
+import { supabase } from '../lib/supabase';
 
 const menuCategories = {
   Cadastros: [
@@ -36,16 +37,92 @@ const menuCategories = {
 
 function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { logout } = useAuthContext();
   const { isDarkMode, toggleDarkMode } = useDarkMode();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [allowedMenuPaths, setAllowedMenuPaths] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetchUserPermissions();
+  }, []);
+
+  const fetchUserPermissions = async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        // If no user, allow all paths (since we're bypassing authentication)
+        setAllowedMenuPaths(['/']);
+        return;
+      }
+
+      // Check if user is admin
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('roles(name)')
+        .eq('user_id', user.id);
+
+      const isAdmin = userRoles?.some(ur => ur.roles?.name === 'admin');
+      
+      if (isAdmin) {
+        // Admin can see everything
+        setAllowedMenuPaths(['all']);
+        return;
+      }
+
+      // Get user permissions
+      const { data: permissions } = await supabase
+        .from('user_permissions')
+        .select('permission_id')
+        .eq('user_id', user.id);
+
+      if (permissions && permissions.length > 0) {
+        const menuPaths = permissions
+          .map(p => p.permission_id)
+          .filter(id => id.startsWith('menu_'))
+          .map(id => id.replace('menu_', '').replace(/_/g, '/'));
+        
+        // Always add dashboard
+        if (!menuPaths.includes('/')) {
+          menuPaths.push('/');
+        }
+        
+        setAllowedMenuPaths(menuPaths);
+      } else {
+        // If no specific permissions, only allow dashboard
+        setAllowedMenuPaths(['/']);
+      }
+    } catch (error) {
+      console.error('Error fetching user permissions:', error);
+      // On error, allow only dashboard
+      setAllowedMenuPaths(['/']);
+    }
+  };
 
   const getCurrentPageTitle = () => {
     for (const [category, items] of Object.entries(menuCategories)) {
       const item = items.find(item => item.path === location.pathname);
       if (item) return item.label;
     }
+    if (location.pathname === '/settings') return 'Configurações';
     return 'Dashboard';
+  };
+
+  const isMenuItemVisible = (path: string): boolean => {
+    // If no permissions loaded yet, show nothing
+    if (allowedMenuPaths.length === 0) {
+      return false;
+    }
+    
+    // Admin can see everything
+    if (allowedMenuPaths.includes('all')) {
+      return true;
+    }
+    
+    // Check if this specific path is allowed
+    return allowedMenuPaths.includes(path);
   };
 
   return (
@@ -70,6 +147,9 @@ function Layout() {
                 </div>
                 {items.map((item) => {
                   const Icon = item.icon;
+                  // Only render menu items the user has permission to see
+                  if (!isMenuItemVisible(item.path)) return null;
+                  
                   return (
                     <Link
                       key={item.path}
